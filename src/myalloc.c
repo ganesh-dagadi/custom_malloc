@@ -18,9 +18,7 @@ void initializeMemory() {
 }
 void* allocateFreeBlock(BLOCK* currFreePtr, BLOCK* prevFreeBlock, int size) {
     void* nextExistMetaStart = currFreePtr->next;
-    // printf("%d \n", currFreePtr->length);
     if (currFreePtr->length > (size + sizeof(BLOCK))){
-        printf("1\n");
         // create a new free block
         BLOCK* newFreeBlock = (BLOCK*)((char*)currFreePtr->start + size);
         newFreeBlock->start = (void*)((char*)newFreeBlock + sizeof(BLOCK));
@@ -28,13 +26,10 @@ void* allocateFreeBlock(BLOCK* currFreePtr, BLOCK* prevFreeBlock, int size) {
         if(prevFreeBlock != NULL) prevFreeBlock->next = newFreeBlock;
         else freeHead = newFreeBlock;
         newFreeBlock->next = nextExistMetaStart;
-        // printf("%p -> %p ; %p \n", prevFreeBlock->next, newFreeBlock, newFreeBlock->next);
     } else if (currFreePtr->length == size){
-        printf("2\n");
         if(prevFreeBlock == NULL) freeHead = currFreePtr->next;
         else prevFreeBlock = currFreePtr->next;
     } else if (heapEnd == (void*)((char*)currFreePtr + currFreePtr->length + sizeof(BLOCK))){ //last block of heap
-        printf("3\n");
         //release wasted memory
         heapEnd = sbrk(-(currFreePtr->length - size));
     }
@@ -50,14 +45,10 @@ void* myalloc(int size) {
     if (heapInitialized == 0) {
         initializeMemory();
     }
-    printf("allocating %d \n", size);
-    BLOCK* currBlockPtr = freeHead;
-    // printf("Free head: %p \n", freeHead);
-    BLOCK* prevFreeBlock = NULL;
-    printf("free: %p \n", freeHead);
+    BLOCK* currBlockPtr = freeHead;;
+    BLOCK* prevFreeBlock = NULL;;
     // find free block and allocate it
     while (currBlockPtr != NULL) {
-        printf("%p, %d \n",currBlockPtr, currBlockPtr->length);
         if(currBlockPtr->length >= size) {
             return allocateFreeBlock(currBlockPtr, prevFreeBlock, size);
         }
@@ -72,49 +63,102 @@ void* myalloc(int size) {
     return newBlockMeta->start;
 }
 
+// void myfree(void* ptr) {
+//     // set into correct position based on memory address of Free LinkList
+//     BLOCK* startBlock = (BLOCK*)((char*)ptr - sizeof(BLOCK));
+//     startBlock->next = NULL;
+//     if (freeHead == NULL) {
+//         freeHead = startBlock;
+//         return;
+//     }
+//     BLOCK* currFreePtr = freeHead;
+//     BLOCK* prevFreePtr = NULL;
+//     while(currFreePtr->next != NULL) {
+//         if (currFreePtr->next > startBlock) {
+//             prevFreePtr = currFreePtr;
+//             currFreePtr = currFreePtr->next;
+//             break;
+//         }
+//         prevFreePtr = currFreePtr;
+//         currFreePtr = currFreePtr->next;
+//     }
+//     if(currFreePtr->next == NULL) {
+//         if (prevFreePtr == NULL) {
+//             // only one free block
+//             if(currFreePtr > startBlock) {
+//                 startBlock->next = currFreePtr;
+//                 freeHead = startBlock;
+//                 mergeBlocks(freeHead, currFreePtr);
+//             } else {
+//                 currFreePtr->next = startBlock;
+//                 mergeBlocks(currFreePtr, startBlock);
+//             }
+//         } else {
+//             if (currFreePtr > startBlock) {
+//                 //add to end of list
+//                 currFreePtr->next = startBlock;
+//                 mergeBlocks(currFreePtr, startBlock);
+//             } else {
+//                 // between last and second last
+//                 prevFreePtr->next = startBlock;
+//                 startBlock->next = currFreePtr;
+//                 mergeBlocks(prevFreePtr, startBlock);
+//                 mergeBlocks(startBlock, currFreePtr);
+//             }
+//             // currFreePtr->next = startBlock;
+//             // mergeBlocks(currFreePtr, startBlock);
+//         }
+//     } else {
+//         prevFreePtr->next = startBlock;
+//         startBlock->next = currFreePtr;
+//         mergeBlocks(prevFreePtr, startBlock);
+//         mergeBlocks(startBlock, currFreePtr);
+//     }
+// }
+
 void myfree(void* ptr) {
-    // set into correct position based on memory address of Free LinkList
-    BLOCK* startBlock = (BLOCK*)((char*)ptr - sizeof(BLOCK));
-    startBlock->next = NULL;
-    if (freeHead == NULL) {
-        freeHead = startBlock;
+    if (!ptr) return;
+
+    BLOCK* block = (BLOCK*)((char*)ptr - sizeof(BLOCK));
+    block->next = NULL;
+
+    // if free list empty
+    if (!freeHead) {
+        freeHead = block;
         return;
     }
-    BLOCK* currFreePtr = freeHead;
-    BLOCK* prevFreePtr = NULL;
-    while(currFreePtr->next != NULL) {
-        if (currFreePtr->next > startBlock) {
-            prevFreePtr = currFreePtr;
-            currFreePtr = currFreePtr->next;
-            break;
-        }
-        prevFreePtr = currFreePtr;
-        currFreePtr = currFreePtr->next;
+
+    BLOCK* curr = freeHead;
+    BLOCK* prev = NULL;
+
+    // find sorted position
+    while (curr && curr < block) {
+        prev = curr;
+        curr = curr->next;
     }
-    if(currFreePtr->next == NULL) {
-        if (prevFreePtr == NULL) {
-            // only one free block
-            if(currFreePtr > startBlock) {
-                startBlock->next = currFreePtr;
-                freeHead = startBlock;
-                mergeBlocks(freeHead, currFreePtr);
-            } else {
-                currFreePtr->next = startBlock;
-                mergeBlocks(currFreePtr, startBlock);
-            }
-        } else {
-            currFreePtr->next = startBlock;
-            mergeBlocks(currFreePtr, startBlock);
-        }
+
+    // insert block
+    block->next = curr;
+    if (prev) {
+        prev->next = block;
     } else {
-        // if startBlock is exactly between prevBlock and currBlock, merge them
-        short isPrevAndStartMergeable = ((char*)prevFreePtr->start + prevFreePtr->length) == (char*)startBlock;
-        short isStartAndCurrMergeable = ((char*)startBlock->start + startBlock->length) == (char*)currFreePtr;
-        mergeBlocks(prevFreePtr, startBlock);
-        mergeBlocks(startBlock, currFreePtr);
+        freeHead = block;
     }
+
+    mergeBlocks(prev, block);
+    mergeBlocks(block, curr);
 }
 
+
+// print free Linked list
+void printLL() {
+    BLOCK* start = freeHead;
+    while(start != NULL) {
+        printf("%p : %d\n", start, start->length);
+        // if(start->next == start) break;
+        start = start->next;
+    }
+}
 void mergeBlocks(BLOCK* blockOne, BLOCK* blockTwo) {
     int isMergable = ((char*)blockOne + sizeof(BLOCK) + blockOne->length) == (char*)blockTwo;
     if(isMergable){

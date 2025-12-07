@@ -12,4 +12,5 @@ extern short heapInitialized;
 extern void* heapEnd;
 void* myalloc(int size);
 void  myfree(void* ptr);
+void printLL();
 #endif
